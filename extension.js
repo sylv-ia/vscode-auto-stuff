@@ -84,7 +84,7 @@ function activate(context) {
 			const stylesFound = file.match(/styles\.[a-zA-Z]*/g).map(x => x.replace('styles.', ''))
 			let styleSheet = file.match(/const styles = StyleSheet\.create\(\{[\s\S]*\}\)/gm)[0]
 			const stylesUsed = styleSheet.match(/.*:[^[]\{/g).map(x => x.slice(0, x.indexOf(':')).trim())
-			const stylesToAdd = stylesFound.filter(x => !stylesUsed.includes(x))
+			const stylesToAdd = [...new Set(stylesFound.filter(x => !stylesUsed.includes(x)))]
 			if (stylesToAdd.length != 0) {
 				const lines = styleSheet.split('\n')
 				for (let i = 0; i < stylesToAdd.length; i++) {

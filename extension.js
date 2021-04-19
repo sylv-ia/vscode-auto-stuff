@@ -3,10 +3,9 @@ const fs = require('fs')
 
 function activate(context) {
 
-	let disposable = vscode.commands.registerCommand('autoStuff.autoImport', () => {
+	let autoImport = vscode.commands.registerCommand('autoStuff.autoImport', () => {
 		const filePath = vscode.window.activeTextEditor?.document.uri.fsPath
 		if (filePath) {
-			//vscode.commands.executeCommand('workbench.action.files.save');
 			const file = fs.readFileSync(filePath, { encoding: 'utf-8' })
 			const lines = file.split('\n')
 
@@ -100,8 +99,37 @@ function activate(context) {
 		}
 	})
 
-	context.subscriptions.push(disposable);
+	let reorderStyles = vscode.commands.registerCommand('autoStuff.reorderStyles', () => {
+		const filePath = vscode.window.activeTextEditor?.document.uri.fsPath
+		if (filePath) {
+			let file = fs.readFileSync(filePath, { encoding: 'utf-8' })
+			const stylesFound = [...new Set(file.match(/styles\.[a-zA-Z]*/g).map(x => x.replace('styles.', '')))]
+			let styleSheet = file.match(/const styles = StyleSheet\.create\(\{[\s\S]*\}\)/gm)[0]
+			const stylesUsed = styleSheet.match(/.*:[^[]\{/g).map(x => x.slice(0, x.indexOf(':')).trim())
+
+			let reordered = ''
+
+			for (let i = 0; i < stylesFound.length; i++) {
+				const styleName = stylesFound[i]
+				const start = styleSheet.indexOf(styleName + ':')
+				let style = styleSheet.slice(start)
+				style = style.slice(0, style.indexOf('},') + 2)
+				file = file.replace(style, '')
+				reordered += '\t' + style + '\n'
+			}
+
+			const lines = file.match(/const styles = StyleSheet\.create\(\{[\s\S]*\}\)/gm)[0].split('\n')
+			lines.splice(-1, 0, reordered)
+			styleSheet = lines.filter(x => x.trim() != '').join('\n')
+			file = file.replace(/const styles = StyleSheet\.create\(\{[\s\S]*\}\)/gm, styleSheet)
+			fs.writeFileSync(filePath, file)
+		}
+	})
+
+
+	context.subscriptions.push(autoImport);
 	context.subscriptions.push(autoStyles);
+	context.subscriptions.push(reorderStyles);
 }
 
 function deactivate() { }

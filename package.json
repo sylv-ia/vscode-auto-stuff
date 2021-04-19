@@ -11,7 +11,8 @@
   ],
   "activationEvents": [
     "onCommand:autoStuff.autoImport",
-    "onCommand:autoStuff.autoStyles"
+    "onCommand:autoStuff.autoStyles",
+    "onCommand:autoStuff.reorderStyles"
   ],
   "main": "./extension.js",
   "contributes": {
@@ -23,6 +24,10 @@
       {
         "command": "autoStuff.autoStyles",
         "title": "Auto Styles"
+      },
+      {
+        "command": "autoStuff.reorderStyles",
+        "title": "Reorder Styles"
       }
     ]
   },

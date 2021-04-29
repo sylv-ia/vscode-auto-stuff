@@ -14,7 +14,7 @@ function activate(context) {
 			let rCompsToImport = []
 			let rImpLine = -1;
 
-			let rnComps = ['View', 'Text', 'TouchableOpacity', 'StyleSheet', 'TextInput', 'Image', 'ScrollView', 'Flatlist', 'Switch', 'Keyboard', 'StatusBar', 'Button',]
+			let rnComps = ['View', 'Text', 'Pressable', 'TouchableOpacity', 'StyleSheet', 'TextInput', 'Image', 'ScrollView', 'Flatlist', 'Switch', 'Keyboard', 'StatusBar', 'Button',]
 			let rnAlreadyImported = []
 			let rnCompsToImport = []
 			let rnImpLine = -1;
@@ -79,57 +79,53 @@ function activate(context) {
 	let autoStyles = vscode.commands.registerCommand('autoStuff.autoStyles', () => {
 		const filePath = vscode.window.activeTextEditor?.document.uri.fsPath
 		if (filePath) {
-			let file = fs.readFileSync(filePath, { encoding: 'utf-8' })
-			const stylesFound = file.match(/styles\.[a-zA-Z]*/g).map(x => x.replace('styles.', ''))
-			let styleSheet = file.match(/const styles = StyleSheet\.create\(\{[\s\S]*\}\)/gm)[0]
-			const stylesUsed = styleSheet.match(/.*:[^[]\{/g).map(x => x.slice(0, x.indexOf(':')).trim())
-			const stylesToAdd = [...new Set(stylesFound.filter(x => !stylesUsed.includes(x)))]
-			if (stylesToAdd.length != 0) {
-				const lines = styleSheet.split('\n')
-				for (let i = 0; i < stylesToAdd.length; i++) {
-					const style = stylesToAdd[i];
-					lines.splice(-1, 0, `\t${style}: {`)
-					lines.splice(-1, 0, `\t\t`)
-					lines.splice(-1, 0, `\t},`)
-				}
-				styleSheet = lines.join('\n')
-				file = file.replace(/const styles = StyleSheet\.create\(\{[\s\S]*\}\)/gm, styleSheet)
-				fs.writeFileSync(filePath, file)
-			}
-		}
-	})
+			const arrRegex = /\[[\s\S]*?]/gm
+			const styleSheetRegex = /const styles = StyleSheet\.create\(\{[\s\S]*?\}\)/gm
 
-	let reorderStyles = vscode.commands.registerCommand('autoStuff.reorderStyles', () => {
-		const filePath = vscode.window.activeTextEditor?.document.uri.fsPath
-		if (filePath) {
-			let file = fs.readFileSync(filePath, { encoding: 'utf-8' })
+			const file = fs.readFileSync(filePath, { encoding: 'utf-8' })
+			// styles used in the file in the form of styles.nameOfStyle
 			const stylesFound = [...new Set(file.match(/styles\.[a-zA-Z]*/g).map(x => x.replace('styles.', '')))]
-			let styleSheet = file.match(/const styles = StyleSheet\.create\(\{[\s\S]*\}\)/gm)[0]
-			const stylesUsed = styleSheet.match(/.*:[^[]\{/g).map(x => x.slice(0, x.indexOf(':')).trim())
+			// the entire const styles = StyleSheet object
+			let styleSheet = file.match(styleSheetRegex)[0]
 
-			let reordered = ''
+			// array of styles that include []s
+			const replacedArrs = styleSheet.match(arrRegex) || []
+			console.log(replacedArrs)
+			//replace the arrays with placeholders
+			replacedArrs.forEach((arrStr, i) => styleSheet = styleSheet.replace(arrStr, `$arrReplace${i}$`))
+			const objString = '{' + styleSheet
+				.slice(styleSheet.indexOf('const styles = StyleSheet.create({') + 34, -2)
+				.replace(/"/g, "'")
+				.replace(/({[\s\S]*?})/g, '`$1`')
+				.slice(1)
+				+ '}'
 
-			for (let i = 0; i < stylesFound.length; i++) {
-				const styleName = stylesFound[i]
-				const start = styleSheet.indexOf(styleName + ':')
-				let style = styleSheet.slice(start)
-				style = style.slice(0, style.indexOf('},') + 2)
-				file = file.replace(style, '')
-				reordered += '\t' + style + '\n'
-			}
+			let styleObjUnsorted
+			eval('styleObjUnsorted = ' + objString)
 
-			const lines = file.match(/const styles = StyleSheet\.create\(\{[\s\S]*\}\)/gm)[0].split('\n')
-			lines.splice(-1, 0, reordered)
-			styleSheet = lines.filter(x => x.trim() != '').join('\n')
-			file = file.replace(/const styles = StyleSheet\.create\(\{[\s\S]*\}\)/gm, styleSheet)
-			fs.writeFileSync(filePath, file)
+			// add styles not already in the stylesheet
+			const stylesUsed = Object.keys(styleObjUnsorted)
+			const stylesToAdd = [...new Set(stylesFound.filter(x => !stylesUsed.includes(x)))]
+			stylesToAdd.forEach(styleKey => styleObjUnsorted[styleKey] = '{\n\t\n\t}')
+
+			// put the stylesheet styles in order of use in the file
+			const order = [...stylesFound, ...new Set((stylesUsed.filter(x => !stylesFound.includes(x))))]
+			const styleObj = {}
+			order.forEach(styleKey => styleObj[styleKey] = styleObjUnsorted[styleKey])
+
+			let newStyles = JSON.stringify(styleObj, null, 2).replace(/"/g, '').replace(/\\n/g, '\r\n').replace(/\\t/g, '\t')
+			// replace the placeholders with the arrays
+			replacedArrs.forEach((arrStr, i) => newStyles = newStyles.replace(`$arrReplace${i}$`, arrStr))
+			newStyles = 'const styles = StyleSheet.create(' + newStyles + ')'
+			const newFile = file.replace(styleSheetRegex, newStyles)
+
+			fs.writeFileSync(filePath, newFile)
+			// */
 		}
 	})
 
-
-	context.subscriptions.push(autoImport);
-	context.subscriptions.push(autoStyles);
-	context.subscriptions.push(reorderStyles);
+	context.subscriptions.push(autoImport)
+	context.subscriptions.push(autoStyles)
 }
 
 function deactivate() { }
